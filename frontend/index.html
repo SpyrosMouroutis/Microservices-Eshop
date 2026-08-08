@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud E-Shop</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; }
+        header { background-color: #2c3e50; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        nav button { background: none; border: none; color: white; font-size: 1rem; margin-right: 1rem; cursor: pointer; }
+        nav button:hover { text-decoration: underline; }
+        .container { max-width: 1000px; margin: 2rem auto; padding: 1.5rem; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 0.5rem; box-sizing: border-box; }
+        button.btn { background-color: #3498db; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; }
+        button.btn:hover { background-color: #2980b9; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+        .product-card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 1rem; text-align: center; }
+        .product-card img { max-width: 100%; height: 140px; object-fit: cover; border-radius: 4px; }
+        .price { color: #27ae60; font-weight: bold; font-size: 1.1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        table, th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>Cloud E-Shop</h2>
+    <nav id="nav-bar" class="hidden">
+        <span id="customer-menu" class="hidden">
+            <button onclick="showPage('products-page')">Products</button>
+            <button onclick="showPage('cart-page')">Cart (<span id="cart-count">0</span>)</button>
+            <button onclick="showPage('orders-page'); loadOrders();">Orders</button>
+        </span>
+        <span id="seller-menu" class="hidden">
+            <button onclick="showPage('seller-page'); loadSellerProducts();">My Products</button>
+        </span>
+        <span style="margin-left: 2rem;">User: <b id="user-display"></b></span>
+        <button onclick="logout()" style="color: #e74c3c;">Logout</button>
+    </nav>
+</header>
+
+<div class="container">
+    <!-- Auth Section -->
+    <div id="auth-page">
+        <h3 id="auth-title">Login</h3>
+        <div id="auth-error" style="color: red; margin-bottom: 1rem;"></div>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="username">
+        </div>
+        <div class="form-group" id="email-group" class="hidden" style="display:none;">
+            <label>Email</label>
+            <input type="email" id="email">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password">
+        </div>
+        <div class="form-group" id="role-group" style="display:none;">
+            <label>Role</label>
+            <select id="role">
+                <option value="customer">Customer</option>
+                <option value="seller">Seller</option>
+            </select>
+        </div>
+        <button class="btn" id="auth-btn" onclick="handleAuth()">Login</button>
+        <p><a href="#" id="toggle-auth" onclick="toggleAuthMode()">Don't have an account? Register</a></p>
+    </div>
+
+    <!-- Customer: Products Page -->
+    <div id="products-page" class="hidden">
+        <h3>Available Products</h3>
+        <input type="text" id="search-input" placeholder="Search products..." onkeyup="loadProducts()" style="padding: 0.5rem; width: 100%; margin-bottom: 1rem;">
+        <div class="product-grid" id="product-list"></div>
+    </div>
+
+    <!-- Customer: Cart Page -->
+    <div id="cart-page" class="hidden">
+        <h3>Shopping Cart</h3>
+        <div id="cart-items"></div>
+        <h4>Total: $<span id="cart-total">0</span></h4>
+        <button class="btn" onclick="checkout()" style="background-color: #27ae60;">Checkout</button>
+    </div>
+
+    <!-- Customer: Orders Page -->
+    <div id="orders-page" class="hidden">
+        <h3>My Orders</h3>
+        <div id="orders-list"></div>
+    </div>
+
+    <!-- Seller: My Products Page -->
+    <div id="seller-page" class="hidden">
+        <h3>My Products</h3>
+        <h4>Add New Product</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+            <input type="text" id="p-title" placeholder="Title">
+            <input type="text" id="p-img" placeholder="Image URL">
+            <input type="number" id="p-price" placeholder="Price">
+            <input type="number" id="p-qty" placeholder="Quantity">
+            <button class="btn" onclick="addProduct()">Add Product</button>
+        </div>
+        <div id="seller-products-list"></div>
+    </div>
+</div>
+
+<script>
+    const KEYCLOAK_URL = 'http://localhost:8080/realms/eshop-realm';
+    const PRODUCT_SERVICE = 'http://localhost:5001';
+    const ORDER_SERVICE = 'http://localhost:5002';
+
+    let isRegisterMode = false;
+    let token = localStorage.getItem('access_token');
+    let currentUser = localStorage.getItem('username');
+    let currentRole = localStorage.getItem('user_role');
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+    function init() {
+        if (token) {
+            document.getElementById('auth-page').classList.add('hidden');
+            document.getElementById('nav-bar').classList.remove('hidden');
+            document.getElementById('user-display').innerText = currentUser;
+            updateCartCount();
+
+            if (currentRole === 'seller') {
+                document.getElementById('seller-menu').classList.remove('hidden');
+                showPage('seller-page');
+                loadSellerProducts();
+            } else {
+                document.getElementById('customer-menu').classList.remove('hidden');
+                showPage('products-page');
+                loadProducts();
+            }
+        }
+    }
+
+    function toggleAuthMode() {
+        isRegisterMode = !isRegisterMode;
+        document.getElementById('auth-title').innerText = isRegisterMode ? 'Register' : 'Login';
+        document.getElementById('auth-btn').innerText = isRegisterMode ? 'Register' : 'Login';
+        document.getElementById('email-group').style.display = isRegisterMode ? 'block' : 'none';
+        document.getElementById('role-group').style.display = isRegisterMode ? 'block' : 'none';
+        document.getElementById('toggle-auth').innerText = isRegisterMode ? 'Already have an account? Login' : "Don't have an account? Register";
+    }
+
+    async function handleAuth() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('auth-error');
+        errorDiv.innerText = '';
+
+        if (isRegisterMode) {
+            const email = document.getElementById('email').value;
+            const role = document.getElementById('role').value;
+            try {
+                // 1. Get Admin Access Token
+                const adminTokenRes = await fetch(`http://localhost:8080/realms/master/protocol/openid-connect/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: 'admin-cli',
+                        username: 'admin',
+                        password: 'admin',
+                        grant_type: 'password'
+                    })
+                });
+
+                if (!adminTokenRes.ok) throw new Error('Keycloak Admin Connection Failed');
+                const adminData = await adminTokenRes.json();
+
+                // 2. Create User via Admin API
+                const createRes = await fetch(`http://localhost:8080/admin/realms/eshop-realm/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${adminData.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        email: email,
+                        enabled: true,
+                        credentials: [{ type: 'password', value: password, temporary: false }]
+                    })
+                });
+
+                if (createRes.status !== 201 && !createRes.ok) {
+                    throw new Error('User registration failed or user already exists.');
+                }
+
+                // 3. Retrieve Created User ID
+                const userRes = await fetch(`http://localhost:8080/admin/realms/eshop-realm/users?username=${username}`, {
+                    headers: { 'Authorization': `Bearer ${adminData.access_token}` }
+                });
+                const users = await userRes.json();
+                if (!users.length) throw new Error('User created but ID lookup failed');
+                const userId = users[0].id;
+
+                // 4. Retrieve Specified Realm Role (seller / customer)
+                const roleRes = await fetch(`http://localhost:8080/admin/realms/eshop-realm/roles/${role}`, {
+                    headers: { 'Authorization': `Bearer ${adminData.access_token}` }
+                });
+                const roleData = await roleRes.json();
+
+                // 5. Assign Realm Role to User
+                await fetch(`http://localhost:8080/admin/realms/eshop-realm/users/${userId}/role-mappings/realm`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${adminData.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([roleData])
+                });
+
+                alert('Registration successful! You can now log in.');
+                isRegisterMode = false;
+                toggleAuthMode();
+            } catch (err) {
+                console.error(err);
+                errorDiv.innerText = err.message || 'Registration failed due to network error';
+            }
+        } else {
+            // Login via Keycloak
+            try {
+                const res = await fetch(`${KEYCLOAK_URL}/protocol/openid-connect/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: 'eshop-app',
+                        username: username,
+                        password: password,
+                        grant_type: 'password'
+                    })
+                });
+                const data = await res.json();
+                if (data.access_token) {
+                    token = data.access_token;
+                    currentUser = username;
+                    
+                    // Extract Realm Roles from JWT
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const roles = payload.realm_access?.roles || [];
+                    currentRole = roles.includes('seller') ? 'seller' : 'customer';
+
+                    localStorage.setItem('access_token', token);
+                    localStorage.setItem('username', currentUser);
+                    localStorage.setItem('user_role', currentRole);
+
+                    location.reload();
+                } else {
+                    errorDiv.innerText = 'Invalid username or password';
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Login server error';
+            }
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        location.reload();
+    }
+
+    function showPage(pageId) {
+        ['products-page', 'cart-page', 'orders-page', 'seller-page'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById(pageId).classList.remove('hidden');
+    }
+
+    async function loadProducts() {
+        const search = document.getElementById('search-input').value;
+        const url = search ? `${PRODUCT_SERVICE}/products/search?name=${search}` : `${PRODUCT_SERVICE}/products`;
+        const res = await fetch(url);
+        const products = await res.json();
+        const list = document.getElementById('product-list');
+        list.innerHTML = products.map(p => `
+            <div class="product-card">
+                <img src="${p.img}" alt="${p.title}" onerror="this.src='https://via.placeholder.com/150'">
+                <h4>${p.title}</h4>
+                <p class="price">$${p.price}</p>
+                <p>Stock: ${p.quantity}</p>
+                <button class="btn" onclick="addToCart(${p.id}, '${p.title}', ${p.price})" ${p.quantity === 0 ? 'disabled' : ''}>Add to Cart</button>
+            </div>
+        `).join('');
+    }
+
+    function addToCart(id, title, price) {
+        const existing = cart.find(item => item.product_id === id);
+        if (existing) {
+            existing.amount += 1;
+        } else {
+            cart.push({ product_id: id, title: title, price: price, amount: 1 });
+        }
+        localStorage.setItem('cart', JSON.stringify(cart));
+        updateCartCount();
+        renderCart();
+    }
+
+    function updateCartCount() {
+        document.getElementById('cart-count').innerText = cart.reduce((sum, item) => sum + item.amount, 0);
+    }
+
+    function renderCart() {
+        const container = document.getElementById('cart-items');
+        let total = 0;
+        container.innerHTML = cart.map((item, idx) => {
+            total += item.price * item.amount;
+            return `
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; align-items:center;">
+                    <span>${item.title} ($${item.price}) x ${item.amount}</span>
+                    <button onclick="removeFromCart(${idx})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; cursor:pointer;">Remove</button>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('cart-total').innerText = total.toFixed(2);
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        updateCartCount();
+        renderCart();
+    }
+
+    async function checkout() {
+        if (cart.length === 0) return alert('Cart is empty');
+        const res = await fetch(`${ORDER_SERVICE}/orders`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ products: cart })
+        });
+        if (res.ok) {
+            alert('Order submitted successfully!');
+            cart = [];
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartCount();
+            showPage('orders-page');
+            loadOrders();
+        } else {
+            alert('Order failed');
+        }
+    }
+
+    async function loadOrders() {
+        const res = await fetch(`${ORDER_SERVICE}/orders/${currentUser}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const orders = await res.json();
+        const container = document.getElementById('orders-list');
+        container.innerHTML = orders.map(o => `
+            <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px;">
+                <p><b>Order ID:</b> #${o.id} | <b>Status:</b> <span style="font-weight:bold; color:${o.status==='Success'?'green':(o.status==='Reject'?'red':'orange')}">${o.status}</span></p>
+                <p><b>Total:</b> $${o.total_price.toFixed(2)}</p>
+            </div>
+        `).join('');
+    }
+
+    async function loadSellerProducts() {
+        const res = await fetch(`${PRODUCT_SERVICE}/products/search?username=${currentUser}`);
+        const products = await res.json();
+        const list = document.getElementById('seller-products-list');
+        list.innerHTML = `
+            <table>
+                <tr><th>ID</th><th>Title</th><th>Price</th><th>Stock</th><th>Action</th></tr>
+                ${products.map(p => `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${p.title}</td>
+                        <td>$${p.price}</td>
+                        <td>${p.quantity}</td>
+                        <td><button onclick="deleteProduct(${p.id})" style="background:#e74c3c; color:white; border:none; padding:4px;">Delete</button></td>
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+    }
+
+    async function addProduct() {
+        const title = document.getElementById('p-title').value;
+        const img = document.getElementById('p-img').value;
+        const price = parseFloat(document.getElementById('p-price').value);
+        const quantity = parseInt(document.getElementById('p-qty').value);
+
+        await fetch(`${PRODUCT_SERVICE}/products`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, img, price, quantity })
+        });
+        loadSellerProducts();
+    }
+
+    async function deleteProduct(id) {
+        await fetch(`${PRODUCT_SERVICE}/product/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        loadSellerProducts();
+    }
+
+    init();
+</script>
+</body>
+</html>
