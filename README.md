@@ -2,8 +2,6 @@
 
 A cloud-native, distributed e-commerce platform designed around **microservices architecture**, **asynchronous event-driven communication**, and **centralized Identity & Access Management (IAM)**. Containerized with Docker Compose and deployed on Google Cloud Platform (GCP).
 
-> **Academic Context:** Developed for the *Cloud & Fog Computing Services (ΠΛΗ513)* graduate/undergraduate course at the **Technical University of Crete (TUC)**.
-
 ---
 
 ## Key Architectural Highlights
