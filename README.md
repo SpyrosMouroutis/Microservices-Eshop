@@ -1,13 +1,5 @@
 ﻿# Cloud E-Shop: Event-Driven Microservices Platform
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Keycloak](https://img.shields.io/badge/Keycloak-IAM-4D4D4D?style=for-the-badge&logo=keycloak&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![GCP](https://img.shields.io/badge/Google_Cloud-Compute_Engine-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)
-
 A cloud-native, distributed e-commerce platform designed around **microservices architecture**, **asynchronous event-driven communication**, and **centralized Identity & Access Management (IAM)**. Containerized with Docker Compose and deployed on Google Cloud Platform (GCP).
 
 > **Academic Context:** Developed for the *Cloud & Fog Computing Services (ΠΛΗ513)* graduate/undergraduate course at the **Technical University of Crete (TUC)**.
