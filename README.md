@@ -72,7 +72,7 @@ To prevent race conditions and tight coupling between services, checkout operati
 * **Keycloak Admin Integration:** Exposes `/register` to programmatically provision users in `eshop-realm` and bind realm roles.
 * **Background Consumer:** Resilient RabbitMQ worker with automatic reconnection backoff for processing inventory deductions.
 
-### 3. Order Service (`main_2.py` — Port `5002`)
+### 3. Order Service (`main.py` — Port `5002`)
 * **Checkout Pipeline:** Validates `customer` role claims, calculates order totals, persists JSON line-item snapshots, and dispatches broker events.
 * **Order History:** Enforces user-level authorization so customers can only query their own order history (`GET /orders/{username}`).
 
